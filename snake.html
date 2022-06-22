@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+  <head lang="en">
+    <meta charset="UTF-8" />
+    <title>贪吃蛇</title>
+  </head>
+  <style>
+    * {
+      touch-action: none;
+    }
+    body {
+      background-color: rgb(168, 168, 168);
+    }
+    h1 {
+      font: 550 normal 50px heiti;
+      text-align: center;
+      margin-bottom: 0px;
+    }
+    h3 {
+      font: 500 normal 20px heiti;
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 40px;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background-color: rgb(255, 255, 255);
+      border-radius: 2px;
+      box-shadow: 0px 0px 2px 22px rgb(161, 161, 161), 0px 0px 20px 20px rgb(0, 0, 0);
+    }
+    .option {
+      margin-top: 30px;
+      text-align: center;
+    }
+    .option button {
+      font: 400 normal 30px songti;
+      box-shadow: 0px 0px 2px 2px black;
+      margin: 20px;
+    }
+    .option .skin {
+      font: 400 normal 30px songti;
+      text-align: center;
+      box-shadow: 0px 0px 2px 2px black;
+      margin: 20px;
+    }
+    .control {
+      padding: 20px;
+      width: 800px;
+      margin: 30px auto;
+      border-radius: 2px;
+      box-shadow: 0px 0px 2px 22px rgb(161, 161, 161), 0px 0px 20px 20px rgb(0, 0, 0);
+    }
+    .control .dir {
+      display: inline-block;
+      position: relative;
+      width: 500px;
+      height: 400px;
+      background-color: rgb(86, 86, 86);
+    }
+    .control .skill {
+      display: inline-block;
+      position: relative;
+      width: 290px;
+      height: 400px;
+      background-color: rgb(90, 90, 90);
+    }
+    span {
+      position: absolute;
+      width: 130px;
+      height: 130px;
+      background-color: rgb(247, 247, 247);
+      border-radius: 20px;
+    }
+    .control .up {
+      top: 0%;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .control .down {
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100%);
+    }
+    .control .left {
+      top: 50%;
+      left: 20%;
+      transform: translateX(-50%) translateY(-50%);
+    }
+    .control .right {
+      top: 50%;
+      left: 80%;
+      transform: translateX(-50%) translateY(-50%);
+    }
+    .skill .upSpeed {
+      top: 50%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-50%);
+    }
+  </style>
+
+  <body>
+    <select class="model">
+      <option value="white">日间</option>
+      <option value="black">夜间</option>
+    </select>
+    <h1>掌机贪吃蛇</h1>
+    <h3>最高记录：</h3>
+    <canvas id="box" width="800" height="800" style="border: 1px solid gray"> </canvas>
+    <video src="./start.mp3" class="music_start" style="display: none" loop></video>
+    <div class="option">
+      <button class="start">开始</button>
+      <button class="restart" style="display: none">重开</button>
+      <button class="scords"></button>
+      <select class="skin">
+        <option value="red">red</option>
+        <option value="blue">blue</option>
+        <option value="black">black</option>
+        <option value="red" class="locked_skin_one">1000解锁</option>
+        <option value="red" class="locked_skin_two">2000解锁</option>
+      </select>
+    </div>
+    <div class="control">
+      <div class="dir">
+        <span class="up" KeyCode="38"></span>
+        <span class="down" KeyCode="40"></span>
+        <span class="left" KeyCode="37"></span>
+        <span class="right" KeyCode="39"></span>
+      </div>
+      <div class="skill">
+        <span class="upSpeed" KeyCode="30"></span>
+      </div>
+    </div>
+  </body>
+
+  <script>
+    var box = document.getElementById("box")
+    var scords = document.querySelector(".scords") //分数
+    scords.innerHTML = "分数:"
+    var cxt = box.getContext("2d")
+    var timer = null
+    var timer_eat = null
+    var hest_record = document.querySelector("h3")
+    var hest_scord //最高分数记录
+
+    // 贪吃蛇属性值
+    var speed_time = 50
+    var rectX = 0
+    var rectY = 0
+    var sheX = 4
+    var sheY = 0
+    // 蛇单位宽高
+    var rectWidth = 20
+    var skin = "red" //贪吃蛇皮肤颜色
+
+    // 蛇尾消除块属性值
+    var qx = -80
+    var qy = 0
+    snack_length = Math.abs(qx) / sheX
+    var jianX = 4
+    var jianY = 0
+    var qxWidth = rectWidth
+
+    // 初始化食物属性值
+    var number = 0 //记录吃的食物的总数
+    var flag //记录是否吃到食物，便于判断是否停止一次清除操作
+    var Fwidth = 20
+    var fx = Math.round(Math.random() * (800 - Fwidth))
+    var fy = Math.round(Math.random() * (800 - Fwidth))
+    var fw = Fwidth
+    var fh = Fwidth
+    var r = Math.round(Math.random() * 255)
+    var g = Math.round(Math.random() * 255)
+    var b = Math.round(Math.random() * 255)
+    cxt.fillStyle = "rgb(" + r + "," + g + "," + b + ")"
+    cxt.fillRect(fx, fy, fw, fh)
+
+    // 变向的点位信息
+    var info = new Set()
+    var status = "start" //判断是否是开始进入边框的状态，便于在边框判定的时候区别
+    var turnDir //转向信息
+    var one_turn = true //记录第一次转向的状态：由于最开始没有转向点位信息，所以不能判定该次转向是否重复
+
+    // 记录蛇的每一段的点位信息
+    var snack = []
+    /*——————对象操作区域——————*/
+    // 贪吃蛇：
+    // 贪吃蛇移动
+    let run
+
+    // 判断是否有最高记录：有就渲染进页面
+    if (!localStorage.getItem("record")) {
+      localStorage.setItem("record", 0)
+      hest_scord = JSON.parse(localStorage.getItem("record"))
+      hest_record.innerHTML = "最高记录：" + localStorage.getItem("record")
+    } else {
+      hest_scord = JSON.parse(localStorage.getItem("record"))
+      hest_record.innerHTML = "最高记录：" + localStorage.getItem("record")
+    }
+
+    // 贪吃蛇头改变移动方向
+    document.onkeydown = function (e) {
+      // 限制转向只能向下
+      if (one_turn) {
+        if (e.keyCode != 40) {
+          return
+        } else {
+          one_turn = false
+        }
+      }
+
+      if ((turnDir != e.keyCode) & (Math.abs(turnDir - e.keyCode) != 2)) {
+        // console.log(Math.round(Math.random() * 400))
+        // 判断：不允许原地掉头，否则点的信息会重叠，且重叠的频率大于清除的速度，会导致出错
+        if (timer) {
+          return
+        }
+        // 增加游戏操作，判断当食物量大于一定程度时，随着移动速度的加快，把灵敏度也可以适当调高
+        if (number >= 120) {
+          clearTimeout(timer)
+          timer = setTimeout(function () {
+            turn_1(e.keyCode)
+            timer = null
+          }, speed_time + 10)
+          return
+        }
+        timer = setTimeout(function () {
+          //这里设置timer是设置了蛇头转向的速度，也就是蛇的灵敏度。
+          // 注：在蛇的速度慢的时候，灵敏度不限制，如果玩家进行非常规操作（疯狂转向），那么转向点的信息录入就会重叠出错
+          turn_1(e.keyCode)
+          timer = null
+        }, speed_time + 50)
+      } else {
+        console.log("不允许重复方向按键，或原地转向")
+      }
+    }
+
+    /*——————函数区域——————*/
+    // 移动函数
+    function move() {
+      if (status === "start") {
+        // 判断游戏结束条件：当蛇头碰到画框边缘，游戏结束
+        // 当蛇头进入边界后，开启判断条件
+        if (rectX > 10) {
+          status = "running"
+          console.log(status)
+        }
+      } else {
+        if (rectX >= 780 || rectY >= 780 || rectX < 0 || rectY < 0) {
+          clearInterval(run)
+          clearInterval(run_upSpeed)
+          music_start.load()
+          music_start.src = "./lose.mp3"
+          music_start.loop = false
+          music_start.play()
+          console.log("撞头了,Game over")
+          statsu = "start"
+        }
+      }
+      // 移动蛇头
+      switch (skin.value) {
+        case "blue":
+          cxt.fillStyle = "blue"
+          break
+        case "red":
+          cxt.fillStyle = "red"
+          break
+        case "black":
+          cxt.fillStyle = "black"
+          break
+        case "colorful":
+          var r = Math.round(Math.random() * 255)
+          var g = Math.round(Math.random() * 255)
+          var b = Math.round(Math.random() * 255)
+          cxt.fillStyle = "rgb(" + r + "," + g + "," + b + ")"
+          break
+      }
+      cxt.fillRect(rectX, rectY, rectWidth, rectWidth)
+      rectX += sheX
+      rectY += sheY
+      // 记录蛇每段的坐标
+      body()
+
+      // 移动消除
+      // 移动中判断，是否吃了食物需要少消除一单位，蛇头是否在某点转向
+      if (!flag) {
+        // 转向原理：再先移动到尾巴正后面，再跟着移动
+        for (let v of info) {
+          // for of循环如果没有更新v的数据就不会重复运行
+          // console.log(Math.abs(qx - v.rectX) === rectWidth, Math.abs(qy - v.rectY) === 0)
+          if ((Math.abs(qx - v.rectX) === rectWidth) & (Math.abs(qy - v.rectY) === 0)) {
+            // 向下转向
+            if (v.Dir === 40) {
+              qx = v.rectX
+              qy = v.rectY - qxWidth
+            } else {
+              qx = v.rectX
+              qy = v.rectY + qxWidth
+            }
+            turn_2(v)
+          } else if ((Math.abs(qy - v.rectY) === rectWidth) & (Math.abs(qx - v.rectX) === 0)) {
+            if (v.Dir === 39) {
+              qx = v.rectX - qxWidth
+              qy = v.rectY
+            } else {
+              qx = v.rectX + qxWidth
+              qy = v.rectY
+            }
+            turn_2(v)
+          }
+        }
+        qx += jianX
+        qy += jianY
+        cxt.clearRect(qx, qy, qxWidth, qxWidth)
+      } else {
+        console.log("吃到东西了")
+        // 吃到东西后判断，尾巴的朝向，增长一格
+        if ([...info][0]) {
+          // console.log([...info][0].Dir === 37 || [...info][0].Dir === 39)
+          // console.log([...info][0].Dir === 37 ||39) 这个判定写法会返回的值是37,39false
+          if ([...info][0].Dir === 37 || [...info][0].Dir === 39) {
+            if (qy > [...info][0].rectY) {
+              qy += qxWidth
+            } else {
+              qy -= qxWidth
+            }
+          } else if ([...info][0].Dir === 38 || [...info][0].Dir === 40) {
+            if (qx > [...info][0].rectX) {
+              qx += qxWidth
+            } else {
+              qx -= qxWidth
+            }
+          }
+        } else {
+          if (qx === rectX) {
+            if (qy > rectY) {
+              qy += 20
+            } else qy -= 20
+          } else if (qy === rectY) {
+            if (qx > rectX) {
+              qx += 20
+            } else qx -= 20
+          }
+        }
+        cxt.clearRect(qx, qy, qxWidth, qxWidth)
+        flag = false
+        // 判断目前吃的食物量，加快移动速度，增加难度
+        // if (number >= 120) {
+        //   speed_time = 20
+        // }
+        clearInterval(run)
+        run = setInterval(move, speed_time)
+      }
+
+      // 移动时吃掉food,随机生成food
+      // 判断：当蛇经过food时，food消失，同时重新生成一个随机food
+      // 设置蛇头和FOOD的中心点位，方便判断
+      var PosX = rectX + rectWidth / 2
+      var PosY = rectY + rectWidth / 2
+      var FX = fx + fw / 2
+      var FY = fy + fh / 2
+
+      // 计算两点间的动态距离L，最远接触点R，最近不接触点r
+      var L = Math.round(Math.pow(Math.abs(PosX - FX) ** 2 + Math.abs(PosY - FY) ** 2, 1 / 2))
+      var R = Math.pow((rectWidth / 2) ** 2 * 2, 1 / 2).toFixed(1) + Math.pow((fw / 2) ** 2 * 2, 1 / 2).toFixed(1)
+      var r = rectWidth / 2 + fw / 2
+      // 判断是否蛇头是否碰到食物：三种情况
+      // 当L>R时：一定碰不到
+      // 当L<r时：一定碰得到
+      // 当R>L>r时：可能碰到，判断PosX和FX的具体距离
+      if (L < r) {
+        console.log("现在一定碰到了！！！吃掉！！！")
+        eat()
+        food()
+        return
+      } else if (R > L && L > r) {
+        console.log("开始精准判定")
+        if (turnDir == 40 || turnDir == 38) {
+          if (Math.abs(PosX - FX) < r) {
+            console.log("侧角碰到了")
+          }
+        }
+        if (turnDir == 39 || turnDir == 37) {
+          if (Math.abs(PosY - FY) < r) {
+            console.log("侧角碰到了")
+          }
+        }
+      }
+    }
+
+    // 转向函数
+    function turn_1(keyCode) {
+      switch (keyCode) {
+        // 向下
+        case 40:
+          sheX = 0
+          sheY = 4
+          break
+        // 向右
+        case 39:
+          sheX = 4
+          sheY = 0
+          break
+        // 向上
+        case 38:
+          sheX = 0
+          sheY = -4
+          break
+        // 向左
+        case 37:
+          sheX = -4
+          sheY = 0
+          break
+      }
+      turnDir = keyCode
+      // 在info数组里存储本次方向变换的坐标及方向信息
+      // 注)arry.push()方法：在数组最后面添加新元素
+      info.add({ rectX, rectY, Dir: keyCode })
+      // 通过计算节点间的距离计算出蛇的长度
+    }
+    function turn_2(v) {
+      switch (v.Dir) {
+        // 向下
+        case 40:
+          jianX = 0
+          jianY = 4
+          break
+        // 向右
+        case 39:
+          jianX = 4
+          jianY = 0
+          break
+        // 向上
+        case 38:
+          jianX = 0
+          jianY = -4
+
+          break
+        // 向左
+        case 37:
+          jianX = -4
+          jianY = 0
+          break
+      }
+      // 清除已经变向之后的点的信息,防止重复变向，扰乱路径
+      info.delete(v)
+    }
+
+    //  生成食物函数
+    // 随机生成食物
+    // 生成的食物不能出现在蛇身体上
+    function food() {
+      fx = Math.round(Math.random() * (400 - Fwidth))
+      fy = Math.round(Math.random() * (400 - Fwidth))
+      // 判断生成的食物是否和蛇身接触，接触就重置
+      touch(fx, fy, "food")
+      // 判断生成的食物是否和蛇身接触，接触就重置
+      touch_tail(fx, fy, "delete")
+
+      fw = Fwidth
+      fh = Fwidth
+      r = Math.round(Math.random() * 255)
+      g = Math.round(Math.random() * 255)
+      b = Math.round(Math.random() * 255)
+      cxt.fillStyle = "rgb(" + r + "," + g + "," + b + ")"
+      cxt.fillRect(fx, fy, fw, fh)
+    }
+
+    // 吃掉食物
+    function eat() {
+      if (timer_eat) return
+      cxt.clearRect(fx, fy, fw, fh)
+      flag = true
+      timer_eat = setTimeout(() => {
+        timer_eat = null
+        // 区域重新清理的速度要求，比移动速度慢一倍以上：保证蛇头经过判断位置再重新开启清除判定
+      }, speed_time * 1.5)
+
+      // 记录吃掉的食物总数
+      number += Fwidth
+      // 通过食物总数，计算出蛇的长度，得出需要运行多少次循环来存储蛇身全部的定位点位信息
+      sheY == 0 ? (snack_length = snack_length + Fwidth / Math.abs(sheX)) : (snack_length = snack_length + Fwidth / Math.abs(sheY))
+      // Fwidth -= 1
+      scords.innerHTML = "分数:" + number
+
+      // 记录最高记录
+      // 更新最高记录l
+      if (number > hest_scord) {
+        hest_scord = number
+        localStorage.setItem("record", hest_scord)
+        hest_record.innerHTML = "最高记录：" + localStorage.getItem("record")
+      }
+      if (speed_time > 30) {
+        speed_time -= 1
+      }
+    }
+
+    // 记录蛇身最新点位
+    function body() {
+      // 记录蛇身点位
+      if (snack.length < snack_length) {
+        snack.push({ rectX, rectY })
+        touch(rectX, rectY)
+      } else if (snack.length >= snack_length) {
+        snack.splice(0, 1)
+        snack.push({ rectX, rectY })
+        touch(rectX, rectY)
+      }
+    }
+
+    // 判定是否接触蛇身
+    function touch(X, Y, session) {
+      // 功能：为当前蛇身设置距离判定，并判断蛇是否触碰到身体
+      // 设置蛇头和身体的中心点位，方便判断
+      for (var i in snack) {
+        // 判定往后移一次，这样就不判定最新的点位信息：最新点位的点和rectX相同，它r不一样，不能像一般那样判定。但也无需判定这一点，所以直接跳过
+        var PosX = X + rectWidth / 2
+        var PosY = Y + rectWidth / 2
+        // 原本思路：根据不同情况，改变蛇每个身段的定位点位，保持判断条件不变
+        // 但是：实际发现，如果要保持唯一判断条件，那么就算在同一种点位计算情况下，在蛇转身的时候判定也会不适合
+        // 改变思路：记录定位点位，直接根据不同情况设置不同的判断条件。
+        //但考虑到上左两种情况的蛇头点位和定位点位的交错，所以定位点位统一后移13个单位
+        // 13个单位经过计算是蛇头上左正常运行时不会触发的判定临界点（原本定位点位最少后移一个单位使之与蛇头点位错开，错开13个那么下右情况下的判定范围就会后移10个单位——意味着蛇头后两个蛇头大小的区域没有判定）
+        if (i >= 13) {
+          var SX = sheY == 0 ? snack[i - 13].rectX + Math.abs(sheX / 2) : snack[i - 13].rectX + rectWidth / 2
+          var SY = sheY == 0 ? snack[i - 13].rectY + rectWidth / 2 : snack[i - 13].rectY + Math.abs(sheY / 2)
+        }
+        // 计算两点间的动态距离L，最远接触点R，最近不接触点r
+        var L = Math.round(Math.pow(Math.abs(PosX - SX) ** 2 + Math.abs(PosY - SY) ** 2, 1 / 2))
+        // var R = Math.round(Math.pow((rectWidth / 2) ** 2 * 2, 1 / 2) + Math.pow((rectWidth / 2) ** 2 + (4 / 2) ** 2, 1 / 2))
+        var r = rectWidth
+        // 判断是否蛇头是否碰到：三种情况
+        // 当L>R时：一定碰不到
+        // 当L<r时：一定碰得到
+        // 当R>L>r时：可能碰到，判断PosX和FX的具体距离
+        if (L < r) {
+          if (session == "food") {
+            console.log("生效了！！！！！！")
+            food()
+            return
+          }
+          console.log("咬到自己了,Game over")
+          console.log(i, r, L)
+          clearInterval(run)
+          clearInterval(run_upSpeed)
+          music_start.load()
+          music_start.src = "./lose.mp3"
+          music_start.loop = false
+          music_start.play()
+          return
+        }
+      }
+    }
+
+    // 判定是否接触蛇尾
+    function touch_tail(X, Y, session) {
+      var PosX = X + rectWidth / 2
+      var PosY = Y + rectWidth / 2
+      // 计算两点间的动态距离L
+      var L = Math.round(Math.pow(Math.abs(PosX - qx) ** 2 + Math.abs(PosY - qy) ** 2, 1 / 2))
+      var r = qxWidth / 2 + Fwidth / 2
+      // 判断是否蛇头是否碰到：三种情况
+      // 当L>R时：一定碰不到
+      // 当L<r时：一定碰得到
+      // 当R>L>r时：可能碰到，判断PosX和FX的具体距离
+      if (L < r) {
+        if (session == "delete") {
+          console.log("食物触碰尾巴生效了！！！！！！")
+          food()
+          return
+        }
+      }
+    }
+  </script>
+  <script>
+    // 游戏音乐
+    var music_start = document.querySelector(".music_start")
+    var start = document.querySelector(".start")
+    var restart = document.querySelector(".option>.restart")
+    var spans = document.querySelectorAll("span")
+    var run_upSpeed //加速功能的定时器：加速功能依靠加减一个定时器来实现
+    var model = document.querySelector(".model") // 皮肤选择
+    var skin = document.querySelector(".skin") // 皮肤选择
+    var skin_lock_one = document.querySelector(".skin> .locked_skin_one") // 皮肤选择
+    var skin_lock_two = document.querySelector(".skin> .locked_skin_two") // 皮肤选择
+    if (JSON.parse(localStorage.getItem("record")) >= 1000) {
+      skin_lock_one.value = "none"
+      skin_lock_one.innerHTML = "changes"
+    }
+    if (JSON.parse(localStorage.getItem("record")) >= 2000) {
+      skin_lock_two.value = "colorful"
+      skin_lock_two.innerHTML = "colorful"
+    }
+    model.onchange = function () {
+      cxt.canvas.style.background = model.value
+    }
+
+    start.onclick = function () {
+      start.style.display = "none"
+      restart.style.display = ""
+      skin.style.display = "none"
+      model.style.display = "none"
+      music_start.muted = false
+      music_start.play()
+      run = setInterval(move, speed_time)
+    }
+    restart.onclick = function () {
+      location.reload()
+      // window.location.href = location.href + "?time=" + new Date().getTime()
+    }
+    for (var i = 0; i < spans.length; i++) {
+      // 手指按下事件设置：改变样式，移动加快
+      spans[i].addEventListener("touchstart", function () {
+        this.style.boxShadow = "0px 0px 25px 10px rgb(161, 161, 161)"
+        this.style.width = "120px"
+        this.style.height = "120px"
+
+        var keyCode = Number(this.getAttribute("KeyCode"))
+        if (run) {
+          //当没有运行的时候不允许叠加加速定时器
+          if (keyCode == 40 || keyCode == 39 || keyCode == 38 || keyCode == 37) return
+          // 移动速度的加快
+          run_upSpeed = setInterval(move, speed_time)
+        }
+      })
+
+      // 手指抬起事件设置：恢复样式，蛇头转向
+      spans[i].addEventListener("touchend", function (e) {
+        e.preventDefault()
+        this.style.boxShadow = ""
+        this.style.width = ""
+        this.style.height = ""
+
+        // 贪吃蛇头改变移动方向
+        var keyCode = Number(this.getAttribute("KeyCode"))
+        if (keyCode == 30) {
+          clearInterval(run_upSpeed)
+          return
+        }
+
+        if ((turnDir != keyCode) & (Math.abs(turnDir - keyCode) != 2)) {
+          if (timer) {
+            return
+          }
+          // 增加游戏操作，判断当食物量大于一定程度时，随着移动速度的加快，把灵敏度也可以适当调高
+          if (number >= 120) {
+            clearTimeout(timer)
+            timer = setTimeout(function () {
+              turn_1(keyCode)
+              timer = null
+            }, speed_time + 10)
+            return
+          }
+          timer = setTimeout(function () {
+            //这里设置timer是设置了蛇头转向的速度，也就是蛇的灵敏度。
+            // 注：在蛇的速度慢的时候，灵敏度不限制，如果玩家进行非常规操作（疯狂转向），那么转向点的信息录入就会重叠出错
+            turn_1(keyCode)
+            timer = null
+          }, speed_time + 50)
+        } else {
+          console.log("不允许重复方向按键，或原地转向")
+        }
+      })
+    }
+  </script>
+</html>
